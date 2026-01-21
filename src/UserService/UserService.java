@@ -1,7 +1,8 @@
-
 import com.sun.net.httpserver.HttpServer;
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpExchange;
+import com.google.gson.Gson;
+import com.google.gson.JsonSyntaxException;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -9,130 +10,135 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
-
-import java.util.List;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.Executors;
-
-import com.google.gson.JsonSyntaxException;
 
 public class UserService {
 
     public static void main(String[] args) throws IOException {
-        int port = 8081; // might want to change port
-        HttpServer server = HttpServer.create(new InetSocketAddress(port), 0);
-        // Example: Set a custom executor with a fixed-size thread pool
-        server.setExecutor(Executors.newFixedThreadPool(20)); // Adjust the pool size as needed
-        // Set up context for /test POST request
-        server.createContext("/edit", new EditHandler());
+        // 1. Initialize DB before server starts
+        DatabaseManager.initialize();
 
-        // Set up context for /test2 GET request
+        int port = 8081;
+        HttpServer server = HttpServer.create(new InetSocketAddress(port), 0);
+        server.setExecutor(Executors.newFixedThreadPool(20));
+
+        server.createContext("/edit", new EditHandler());
         server.createContext("/retrieve", new RetrieveHandler());
 
-
-        server.setExecutor(null); // creates a default executor gemini says to remove to use all 20 threads
-
         server.start();
-
         System.out.println("Server started on port " + port);
     }
 
+    // --- HANDLER FOR POST (Create, Update, Delete) ---
     static class EditHandler implements HttpHandler {
         @Override
         public void handle(HttpExchange exchange) throws IOException {
-            // Handle POST request for /test
-            if ("POST".equals(exchange.getRequestMethod())) {
-                try {
-                    Gson gson = new Gson();
-                    // need to get data
-                    UserData user = gson.fromJson(jsonBody, UserData.class);
-                    
-                    // 2. If we get here, the types were correct. 
-                    // TODO: check command and procede based on that
-                    sendResponse(exchange, "Success! User processed.");
+            if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
+                sendResponse(exchange, 405, "Error: Method must be POST");
+                return;
+            }
 
-                } catch (JsonSyntaxException e) {
-                    // 3. If we catch this, the user sent bad types (e.g. "abc" instead of 123)
-                    System.err.println("JSON Error: " + e.getMessage());
-                    
-                    // Send HTTP 400 (Bad Request)
-                    String errorResponse = "Error: Invalid data types in JSON.";
-                    exchange.sendResponseHeaders(400, errorResponse.length());
-                    OutputStream os = exchange.getResponseBody();
-                    os.write(errorResponse.getBytes());
-                    os.close();
+            try {
+                // Read and Parse JSON
+                String body = getRequestBody(exchange);
+                Gson gson = new Gson();
+                UserData user = gson.fromJson(body, UserData.class);
+
+                if (user.command == null) throw new IllegalArgumentException("Command is required");
+
+                // Execute Logic based on Command
+                switch (user.command.toLowerCase()) {
+                    case "create":
+                        DatabaseManager.createUser(user.username, user.email, user.password);
+                        sendResponse(exchange, 200, "User Created: " + user.username);
+                        break;
+                    case "update":
+                        if (user.id == 0) throw new IllegalArgumentException("ID required for update");
+                        DatabaseManager.updateUser(user.id, user.username, user.email);
+                        sendResponse(exchange, 200, "User Updated: " + user.id);
+                        break;
+                    case "delete":
+                        if (user.id == 0) throw new IllegalArgumentException("ID required for delete");
+                        DatabaseManager.deleteUser(user.id);
+                        sendResponse(exchange, 200, "User Deleted: " + user.id);
+                        break;
+                    default:
+                        sendResponse(exchange, 400, "Unknown command: " + user.command);
                 }
-
-            } else {
-                // Send a 405 Method Not Allowed response for non-POST requests
-                exchange.sendResponseHeaders(405, 0);
-                exchange.close();
+            } catch (JsonSyntaxException e) {
+                sendResponse(exchange, 400, "Invalid JSON format");
+            } catch (Exception e) {
+                e.printStackTrace(); // Log to console for debugging
+                sendResponse(exchange, 500, "Server Error: " + e.getMessage());
             }
         }
-
-        private static String getRequestBody(HttpExchange exchange) throws IOException {
-            try (BufferedReader br = new BufferedReader(new InputStreamReader(exchange.getRequestBody(), StandardCharsets.UTF_8))) {
-                StringBuilder requestBody = new StringBuilder();
-                String line;
-                while ((line = br.readLine()) != null) {
-                    requestBody.append(line);
-                }
-                return requestBody.toString();
-            }
-        }
-
     }
 
+    // --- HANDLER FOR GET (Retrieve) ---
     static class RetrieveHandler implements HttpHandler {
         @Override
         public void handle(HttpExchange exchange) throws IOException {
-            // Handle GET request for /test2
-            // TODO let's do this in class.
-            if ("GET".equals(exchange.getRequestMethod())) {
-                // need to get user data, verify, grab from db
-                String requestMethod = exchange.getRequestMethod();
-                String clientAddress = exchange.getRemoteAddress().getAddress().toString();
-                String requestURI = exchange.getRequestURI().toString();
-
-                System.out.println("Request method: " + requestMethod);
-                System.out.println("Client Address: " + clientAddress);
-                System.out.println("Request URI: " + requestURI);
-
-
-                String response = "Received GET for /test2 lecture foo W.";
-                sendResponse(exchange, response);
-
-
-
-
-            } else {
-                exchange.sendResponseHeaders(405,0);
-                exchange.close();
+            if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
+                sendResponse(exchange, 405, "Error: Method must be GET");
+                return;
             }
 
+            // Parse ID from URL: /retrieve?id=1
+            Map<String, String> params = parseQuery(exchange.getRequestURI().getQuery());
+            
+            if (params.containsKey("id")) {
+                int id = Integer.parseInt(params.get("id"));
+                UserData user = DatabaseManager.getUser(id);
+
+                if (user != null) {
+                    Gson gson = new Gson();
+                    String jsonResponse = gson.toJson(user);
+                    // Send strictly JSON back
+                    exchange.getResponseHeaders().set("Content-Type", "application/json");
+                    sendResponse(exchange, 200, jsonResponse);
+                } else {
+                    sendResponse(exchange, 404, "User not found");
+                }
+            } else {
+                sendResponse(exchange, 400, "Missing 'id' parameter");
+            }
         }
     }
 
-    static class TestUserHandler implements HttpHandler {
-        @Override
-        public void handle(HttpExchange exchange) throws IOException {
-            // Handle GET request for /test2
-            // TODO let's do this in class.
+    // --- HELPER METHODS ---
+
+    private static void sendResponse(HttpExchange exchange, int statusCode, String response) throws IOException {
+        exchange.sendResponseHeaders(statusCode, response.length());
+        try (OutputStream os = exchange.getResponseBody()) {
+            os.write(response.getBytes(StandardCharsets.UTF_8));
         }
     }
 
-    private static void sendResponse(HttpExchange exchange, String response) throws IOException {
-        exchange.sendResponseHeaders(200, response.length());
-        OutputStream os = exchange.getResponseBody();
-        os.write(response.getBytes(StandardCharsets.UTF_8));
-        os.close();
+    private static String getRequestBody(HttpExchange exchange) throws IOException {
+        try (BufferedReader br = new BufferedReader(new InputStreamReader(exchange.getRequestBody(), StandardCharsets.UTF_8))) {
+            StringBuilder requestBody = new StringBuilder();
+            String line;
+            while ((line = br.readLine()) != null) {
+                requestBody.append(line);
+            }
+            return requestBody.toString();
+        }
     }
-}
 
-class UserData { // need to check types for ID and potentially for email and hash password
-    String command;
-    int id;
-    String username;
-    String email;
-    String password;
+    // Parses "id=1&name=bob" into a Map
+    private static Map<String, String> parseQuery(String query) {
+        Map<String, String> result = new HashMap<>();
+        if (query == null) return result;
+        for (String param : query.split("&")) {
+            String[] entry = param.split("=");
+            if (entry.length > 1) {
+                result.put(entry[0], entry[1]);
+            } else {
+                result.put(entry[0], "");
+            }
+        }
+        return result;
+    }
 }
