@@ -23,7 +23,7 @@ public class DatabaseManager {
     // --- Initialization ---
     public static void initialize() {
         String sql = "CREATE TABLE IF NOT EXISTS users (" +
-                     "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                     "id INTEGER PRIMARY KEY, " +
                      "username TEXT NOT NULL UNIQUE, " +
                      "email TEXT, " +
                      "password TEXT)";
@@ -37,22 +37,24 @@ public class DatabaseManager {
 
     // --- CRUD OPERATIONS ---
 
-    public static void createUser(String username, String email, String password) throws SQLException {
-        String sql = "INSERT INTO users(username, email, password) VALUES(?,?,?)";
+    public static void createUser(int id, String username, String email, String password) throws SQLException {
+        String sql = "INSERT INTO users(id, username, email, password) VALUES(?,?,?,?)";
         try (Connection conn = connect(); PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setString(1, username);
-            pstmt.setString(2, email);
-            pstmt.setString(3, password);
+            pstmt.setInt(1, id);
+            pstmt.setString(2, username);
+            pstmt.setString(3, email);
+            pstmt.setString(4, password);
             pstmt.executeUpdate();
         }
     }
 
-    public static void updateUser(int id, String username, String email) throws SQLException {
-        String sql = "UPDATE users SET username = ?, email = ? WHERE id = ?";
+    public static void updateUser(int id, String username, String email, String password) throws SQLException {
+        String sql = "UPDATE users SET username = ?, email = ?, password = ? WHERE id = ?";
         try (Connection conn = connect(); PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setString(1, username);
             pstmt.setString(2, email);
-            pstmt.setInt(3, id);
+            pstmt.setString(3, password);
+            pstmt.setInt(4, id);
             pstmt.executeUpdate();
         }
     }

@@ -1,0 +1,227 @@
+--- TEST RUN RESULTS ---
+Total Tests: 28
+
+=== TEST: user_create_200_1000 ===
+TYPE: POST (create)
+SENT: {"command": "create", "id": 1000, "username": "tester1000", "email": "test1000@test.com", "password": "password1000"}
+STATUS: 200
+RECEIVED: {"command":"create","id":1000,"username":"tester1000","email":"test1000@test.com","password":"FBEC9326096D714E466E80A9F6CD917C72D976C4014588EA679769008360DDF0"}
+
+----------------------------------------
+
+=== TEST: user_create_200_1001 ===
+TYPE: POST (create)
+SENT: {"command": "create", "id": 1001, "username": "tester1001", "email": "test1001@test.com", "password": "password1001"}
+STATUS: 200
+RECEIVED: {"command":"create","id":1001,"username":"tester1001","email":"test1001@test.com","password":"551ACDAF1F6CEB312384854BBFFDA99324CD0927DD611A8868F7CA928689447E"}
+
+----------------------------------------
+
+=== TEST: user_create_200_1002 ===
+TYPE: POST (create)
+SENT: {"command": "create", "id": 1002, "username": "tester1002", "email": "test1002@test.com", "password": "password1002"}
+STATUS: 200
+RECEIVED: {"command":"create","id":1002,"username":"tester1002","email":"test1002@test.com","password":"21C2B2791F532C49862E751D37F1FA15939CA50953F454F82D55A13FE6604C73"}
+
+----------------------------------------
+
+=== TEST: user_create_200_1003 ===
+TYPE: POST (create)
+SENT: {"command": "create", "id": 1003, "username": "tester1003", "email": "test1003@test.com", "password": "password1003"}
+STATUS: 200
+RECEIVED: {"command":"create","id":1003,"username":"tester1003","email":"test1003@test.com","password":"8AD54FC27D1FDCCEF25323CCFBD6E8B05BFAB215F7A48F691137A7BF26A36D6F"}
+
+----------------------------------------
+
+=== TEST: user_create_200_1004 ===
+TYPE: POST (create)
+SENT: {"command": "create", "id": 1004, "username": "tester1004", "email": "test1004@test.com", "password": "password1004"}
+STATUS: 200
+RECEIVED: {"command":"create","id":1004,"username":"tester1004","email":"test1004@test.com","password":"9EE2D09628AAFD102E502079BEAFAC9FBF139A110574FD19AAB359FF9F5E816E"}
+
+----------------------------------------
+
+=== TEST: user_create_200_1005 ===
+TYPE: POST (create)
+SENT: {"command": "create", "id": 1005, "username": "tester1005", "email": "test1005@test.com", "password": "password1005"}
+STATUS: 200
+RECEIVED: {"command":"create","id":1005,"username":"tester1005","email":"test1005@test.com","password":"8079A043AA757F81F77A99447D96919F0ACB2B8ABCC666BA82218F194A587C9F"}
+
+----------------------------------------
+
+=== TEST: user_create_200_1006 ===
+TYPE: POST (create)
+SENT: {"command": "create", "id": 1006, "username": "tester1006", "email": "test1006@test.com", "password": "password1006"}
+STATUS: 200
+RECEIVED: {"command":"create","id":1006,"username":"tester1006","email":"test1006@test.com","password":"F250998AB071245263BEFC8DDE67EC16565E03B9C33C080F0CDFD004822E5F13"}
+
+----------------------------------------
+
+=== TEST: user_create_200_1007 ===
+TYPE: POST (create)
+SENT: {"command": "create", "id": 1007, "username": "tester1007", "email": "test1007@test.com", "password": "password1007"}
+STATUS: 200
+RECEIVED: {"command":"create","id":1007,"username":"tester1007","email":"test1007@test.com","password":"AA2114A93B38168CA4D15F1CDDD9E8139D696A0F492743078486D86B72CAEC42"}
+
+----------------------------------------
+
+=== TEST: user_create_200_1008 ===
+TYPE: POST (create)
+SENT: {"command": "create", "id": 1008, "username": "tester1008", "email": "test1008@test.com", "password": "password1008"}
+STATUS: 200
+RECEIVED: {"command":"create","id":1008,"username":"tester1008","email":"test1008@test.com","password":"FF0F47B3023390612B94AFBDEE6CBD8A7E4306E972F4A0F512FC48546117C644"}
+
+----------------------------------------
+
+=== TEST: user_create_200_1009 ===
+TYPE: POST (create)
+SENT: {"command": "create", "id": 1009, "username": "tester1009", "email": "test1009@test.com", "password": "password1009"}
+STATUS: 200
+RECEIVED: {"command":"create","id":1009,"username":"tester1009","email":"test1009@test.com","password":"7D5FE1E549DD8EAD62C6E99F5EA73BDB55A9FD317DB5BCF6E03CD014C0742B40"}
+
+----------------------------------------
+
+=== TEST: user_create_400_empty_username_1010 ===
+TYPE: POST (create)
+SENT: {"command": "create", "id": 1010, "username": "", "email": "test1010@test.com", "password": "password1010"}
+STATUS: 400
+ERROR BODY: Error: Username is required
+
+----------------------------------------
+
+=== TEST: user_create_400_missing_password_1011 ===
+TYPE: POST (create)
+SENT: {"command": "create", "id": 1011, "username": "tester1011", "email": "test1011@test.com"}
+STATUS: 400
+ERROR BODY: Error: Password is required
+
+----------------------------------------
+
+=== TEST: user_create_400_invalid_email_type_1012 ===
+TYPE: POST (create)
+SENT: {"command": "create", "id": 1012, "username": "tester1012", "email": 1012, "password": "password1012"}
+STATUS: 400
+ERROR BODY: Error: Invalid or missing email
+
+----------------------------------------
+
+=== TEST: user_create_409_duplicate_userID_1000 ===
+TYPE: POST (create)
+SENT: {"command": "create", "id": 1000, "username": "tester1000-duplicate", "email": "test1000-duplicate@test.com", "password": "password1000-duplicate"}
+STATUS: 409
+ERROR BODY: Error: User with this ID or Username already exists
+
+----------------------------------------
+
+=== TEST: user_update_200_email_password_1001 ===
+TYPE: POST (update)
+SENT: {"command": "update", "id": 1001, "username": "tester1001-update", "email": "testupdate1001@test.com", "password": "password1001-update"}
+STATUS: 200
+RECEIVED: {"id":1001,"username":"tester1001-update","email":"testupdate1001@test.com","password":"8A72452C6B555347259530BB601A23B69BE85ECBDF5D3539FF51FD8A8E00C8BD"}
+
+----------------------------------------
+
+=== TEST: user_update_200_only_required_fields_1002 ===
+TYPE: POST (update)
+SENT: {"command": "update", "id": 1002}
+STATUS: 200
+RECEIVED: {"id":1002,"username":"tester1002","email":"test1002@test.com","password":"21C2B2791F532C49862E751D37F1FA15939CA50953F454F82D55A13FE6604C73"}
+
+----------------------------------------
+
+=== TEST: user_update_400_missing_id ===
+TYPE: POST (update)
+SENT: {"command": "update", "username": "tester-update", "email": "testupdate@test.com"}
+STATUS: 400
+ERROR BODY: Error: ID required for update
+
+----------------------------------------
+
+=== TEST: user_update_400_invalid_email_type_1003 ===
+TYPE: POST (update)
+SENT: {"command": "update", "id": 1003, "email": 1003}
+STATUS: 400
+ERROR BODY: Error: Invalid email format
+
+----------------------------------------
+
+=== TEST: user_update_400_empty_email_password_1004 ===
+TYPE: POST (update)
+SENT: {"command": "update", "id": 1004, "username": "tester1004-update", "email": "", "password": ""}
+STATUS: 400
+ERROR BODY: Error: Email cannot be empty
+
+----------------------------------------
+
+=== TEST: user_update_404_invalid_id ===
+TYPE: POST (update)
+SENT: {"command": "update", "id": 10001, "username": "tester10001-update", "email": "testupdate10001@test.com", "password": "password10001"}
+STATUS: 404
+ERROR BODY: Error: User ID not found
+
+----------------------------------------
+
+=== TEST: user_delete_200_1005 ===
+TYPE: POST (delete)
+SENT: {"command": "delete", "id": 1005, "username": "tester1005", "email": "test1005@test.com", "password": "password1005"}
+STATUS: 200
+RECEIVED: {}
+
+----------------------------------------
+
+=== TEST: user_delete_400_missing_email_field_1006 ===
+TYPE: POST (delete)
+SENT: {"command": "delete", "id": 1006, "username": "tester1006", "password": "password1006"}
+STATUS: 400
+ERROR BODY: Error: Invalid or missing email
+
+----------------------------------------
+
+=== TEST: user_delete_404_invalid_id ===
+TYPE: POST (delete)
+SENT: {"command": "delete", "id": 10002, "username": "tester10002", "email": "test10002@test.com", "password": "password10002"}
+STATUS: 404
+ERROR BODY: Error: User not found
+
+----------------------------------------
+
+=== TEST: user_delete_404,401_fields_dont_match_1007 ===
+TYPE: POST (delete)
+SENT: {"command": "delete", "id": 1007, "username": "tester1007", "email": "test1007@test.com", "password": "WrongPassword"}
+STATUS: 401
+ERROR BODY: Error: Data mismatch. Delete failed.
+
+----------------------------------------
+
+=== TEST: user_get_200_1000 ===
+TYPE: GET
+URL: http://localhost:8081/retrieve?id=1000
+STATUS: 200
+RECEIVED: {"id":1000,"username":"tester1000","email":"test1000@test.com","password":"***"}
+
+----------------------------------------
+
+=== TEST: user_get_200_1001 ===
+TYPE: GET
+URL: http://localhost:8081/retrieve?id=1001
+STATUS: 200
+RECEIVED: {"id":1001,"username":"tester1001-update","email":"testupdate1001@test.com","password":"***"}
+
+----------------------------------------
+
+=== TEST: user_get_400_invalid_type ===
+TYPE: GET
+URL: http://localhost:8081/retrieve?id=abcd
+STATUS: 400
+ERROR BODY: Error: ID must be a number
+
+----------------------------------------
+
+=== TEST: user_get_404,400_invalid_id ===
+TYPE: GET
+URL: http://localhost:8081/retrieve?id=10000
+STATUS: 404
+ERROR BODY: User not found
+
+----------------------------------------
+
