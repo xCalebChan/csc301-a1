@@ -2,6 +2,11 @@ import com.sun.net.httpserver.HttpServer;
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpExchange;
 
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+import com.google.gson.JsonSyntaxException;
+
 import java.io.*;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
@@ -44,6 +49,73 @@ public class ProductService {
         }
     }
 
+    // ---- validation helpers ----
+    private static boolean isBlank(String s) {
+        return s == null || s.trim().isEmpty();
+    }
+
+    private static void requireNonNull(HttpExchange ex, Object value, String field) throws IOException {
+        if (value == null) {
+            sendJson(ex, 400, "{\"error\":\"Missing required field: " + field + "\"}");
+            throw new IllegalArgumentException("Missing " + field);
+        }
+    }
+
+    private static void requireNonBlank(HttpExchange ex, String value, String field) throws IOException {
+        if (isBlank(value)) {
+            // Treat blank as invalid (even if present)
+            sendJson(ex, 400, "{\"error\":\"Field cannot be empty: " + field + "\"}");
+            throw new IllegalArgumentException("Empty " + field);
+        }
+    }
+
+    private static void requirePositiveInt(HttpExchange ex, Integer value, String field) throws IOException {
+        requireNonNull(ex, value, field);
+        if (value <= 0) {
+            sendJson(ex, 400, "{\"error\":\"Field must be > 0: " + field + "\"}");
+            throw new IllegalArgumentException("Invalid " + field);
+        }
+    }
+
+    private static void requireNonNegativeInt(HttpExchange ex, Integer value, String field) throws IOException {
+        requireNonNull(ex, value, field);
+        if (value < 0) {
+            sendJson(ex, 400, "{\"error\":\"Field must be >= 0: " + field + "\"}");
+            throw new IllegalArgumentException("Invalid " + field);
+        }
+    }
+
+    private static void requireNonNegativeDouble(HttpExchange ex, Double value, String field) throws IOException {
+        requireNonNull(ex, value, field);
+        if (value.isNaN() || value.isInfinite() || value < 0.0) {
+            sendJson(ex, 400, "{\"error\":\"Field must be >= 0: " + field + "\"}");
+            throw new IllegalArgumentException("Invalid " + field);
+        }
+    }
+
+    // For PATCH-like update: validate only if provided
+    private static void validateOptionalNonBlank(HttpExchange ex, String value, String field) throws IOException {
+        if (value != null && isBlank(value)) {
+            sendJson(ex, 400, "{\"error\":\"Field cannot be empty: " + field + "\"}");
+            throw new IllegalArgumentException("Empty " + field);
+        }
+    }
+
+    private static void validateOptionalNonNegativeInt(HttpExchange ex, Integer value, String field) throws IOException {
+        if (value != null && value < 0) {
+            sendJson(ex, 400, "{\"error\":\"Field must be >= 0: " + field + "\"}");
+            throw new IllegalArgumentException("Invalid " + field);
+        }
+    }
+
+    private static void validateOptionalNonNegativeDouble(HttpExchange ex, Double value, String field) throws IOException {
+        if (value != null && (value.isNaN() || value.isInfinite() || value < 0.0)) {
+            sendJson(ex, 400, "{\"error\":\"Field must be >= 0: " + field + "\"}");
+            throw new IllegalArgumentException("Invalid " + field);
+        }
+    }
+
+
     // ---------- Main ----------
     public static void main(String[] args) throws IOException {
         initDb();
@@ -54,7 +126,7 @@ public class ProductService {
         server.start();
 
         System.out.println("ProductService started on port " + PORT);
-        System.out.println("SQLite DB: products.db (auto-created if missing)");
+        System.out.println("SQLite DB: products.db");
     }
 
     // ---------- DB init / connection ----------
@@ -82,8 +154,7 @@ public class ProductService {
     private static Connection openConn() throws SQLException {
         return DriverManager.getConnection(DB_URL);
     }
-
-    // ---------- HTTP Handler ----------
+    
     static class ProductHandler implements HttpHandler {
         @Override
         public void handle(HttpExchange exchange) throws IOException {
@@ -105,40 +176,41 @@ public class ProductService {
 
         // -------- POST /product --------
         private void handlePost(HttpExchange exchange) throws IOException, SQLException {
-            String body = readBody(exchange);
+            try {
+                String body = readBody(exchange);
 
-            String command = getJsonString(body, "command");
-            Integer id = getJsonInt(body, "id");
+                JsonObject json = parseJsonObject(exchange, body);
 
-            if (command == null || id == null) {
-                sendJson(exchange, 400, "{\"error\":\"Missing required field(s): command, id\"}");
-                return;
-            }
+                String command = jString(json, "command");
+                Integer id = jInt(json, "id");
 
-            command = command.trim().toLowerCase();
 
-            switch (command) {
-                case "create":
-                    handleCreate(exchange, body, id);
-                    break;
-                case "update":
-                    handleUpdate(exchange, body, id);
-                    break;
-                case "delete":
-                    handleDelete(exchange, body, id);
-                    break;
-                default:
-                    sendJson(exchange, 400, "{\"error\":\"Invalid command\"}");
+                requireNonBlank(exchange, command, "command");
+                requirePositiveInt(exchange, id, "id");
+
+                command = command.trim().toLowerCase();
+
+                switch (command) {
+                    case "create": handleCreate(exchange, json, body, id); break;
+                    case "update": handleUpdate(exchange, json, body, id); break;
+                    case "delete": handleDelete(exchange, json, body, id); break;
+                    default: sendJson(exchange, 400, "{\"error\":\"Invalid command\"}");
+                }
+            } catch (IllegalArgumentException ignored) {
+                // validation already responded with 400
             }
         }
 
-        private void handleCreate(HttpExchange exchange, String body, int id) throws IOException, SQLException {
-            String productname = getJsonString(body, "productname");
-            Double price = getJsonDouble(body, "price");
-            Integer quantity = getJsonInt(body, "quantity");
+        private void handleCreate(HttpExchange exchange, JsonObject json, String body, int id) throws IOException, SQLException {
+            String productname = jString(json, "productname");
+            Double price = jDouble(json, "price");
+            Integer quantity = jInt(json, "quantity");
 
-            if (productname == null || price == null || quantity == null) {
-                sendJson(exchange, 400, "{\"error\":\"Missing required field(s) for create\"}");
+            try {
+                requireNonBlank(exchange, productname, "productname");
+                requireNonNegativeDouble(exchange, price, "price");
+                requireNonNegativeInt(exchange, quantity, "quantity");
+            } catch (IllegalArgumentException ignored) {
                 return;
             }
 
@@ -161,15 +233,26 @@ public class ProductService {
             sendJson(exchange, 200, new Product(id, productname, price, quantity).toJson());
         }
 
-        private void handleUpdate(HttpExchange exchange, String body, int id) throws IOException, SQLException {
-            String productname = getJsonString(body, "productname");
-            Double price = getJsonDouble(body, "price");
-            Integer quantity = getJsonInt(body, "quantity");
+        private void handleUpdate(HttpExchange exchange, JsonObject json, String body, int id) throws IOException, SQLException {
+            String productname = jString(json, "productname");
+            Double price = jDouble(json, "price");
+            Integer quantity = jInt(json, "quantity");
 
-            if (productname == null && price == null && quantity == null) {
-                sendJson(exchange, 400, "{\"error\":\"No updatable fields provided\"}");
+            try {
+                // must provide at least one updatable field
+                if (productname == null && price == null && quantity == null) {
+                    sendJson(exchange, 400, "{\"error\":\"No updatable fields provided\"}");
+                    return;
+                }
+
+                // validate only the provided ones
+                validateOptionalNonBlank(exchange, productname, "productname");
+                validateOptionalNonNegativeDouble(exchange, price, "price");
+                validateOptionalNonNegativeInt(exchange, quantity, "quantity");
+            } catch (IllegalArgumentException ignored) {
                 return;
             }
+
 
             Product updated;
             try (Connection c = openConn()) {
@@ -198,13 +281,16 @@ public class ProductService {
             sendJson(exchange, 200, updated.toJson());
         }
 
-        private void handleDelete(HttpExchange exchange, String body, int id) throws IOException, SQLException {
-            String productname = getJsonString(body, "productname");
-            Double price = getJsonDouble(body, "price");
-            Integer quantity = getJsonInt(body, "quantity");
+        private void handleDelete(HttpExchange exchange, JsonObject json, String body, int id) throws IOException, SQLException {
+            String productname = jString(json, "productname");
+            Double price = jDouble(json, "price");
+            Integer quantity = jInt(json, "quantity");
 
-            if (productname == null || price == null || quantity == null) {
-                sendJson(exchange, 400, "{\"error\":\"Missing required field(s) for delete\"}");
+            try {
+                requireNonBlank(exchange, productname, "productname");
+                requireNonNegativeDouble(exchange, price, "price");
+                requireNonNegativeInt(exchange, quantity, "quantity");
+            } catch (IllegalArgumentException ignored) {
                 return;
             }
 
@@ -320,56 +406,32 @@ public class ProductService {
         }
     }
 
-    // ---------- Tiny JSON helpers ----------
-    private static String getJsonString(String json, String key) {
-        String pattern = "\"" + key + "\"";
-        int k = json.indexOf(pattern);
-        if (k < 0) return null;
-        int colon = json.indexOf(':', k);
-        if (colon < 0) return null;
-
-        int firstQuote = json.indexOf('"', colon + 1);
-        if (firstQuote < 0) return null;
-        int secondQuote = json.indexOf('"', firstQuote + 1);
-        if (secondQuote < 0) return null;
-
-        return json.substring(firstQuote + 1, secondQuote);
-    }
-
-    private static Integer getJsonInt(String json, String key) {
-        String raw = getJsonNumberRaw(json, key);
-        if (raw == null) return null;
+    // Parse once per request body
+    private static JsonObject parseJsonObject(HttpExchange ex, String body) throws IOException {
         try {
-            return Integer.parseInt(raw);
-        } catch (NumberFormatException e) {
-            return null;
+            return JsonParser.parseString(body).getAsJsonObject();
+        } catch (JsonSyntaxException | IllegalStateException e) {
+            sendJson(ex, 400, "{\"error\":\"Invalid JSON\"}");
+            throw new IllegalArgumentException("invalid json");
         }
     }
 
-    private static Double getJsonDouble(String json, String key) {
-        String raw = getJsonNumberRaw(json, key);
-        if (raw == null) return null;
-        try {
-            return Double.parseDouble(raw);
-        } catch (NumberFormatException e) {
-            return null;
-        }
+    // Safe getters: return null if missing or explicit null
+    private static String jString(JsonObject o, String key) {
+        JsonElement e = o.get(key);
+        if (e == null || e.isJsonNull()) return null;
+        return e.getAsString();
     }
 
-    private static String getJsonNumberRaw(String json, String key) {
-        String pattern = "\"" + key + "\"";
-        int k = json.indexOf(pattern);
-        if (k < 0) return null;
-        int colon = json.indexOf(':', k);
-        if (colon < 0) return null;
+    private static Integer jInt(JsonObject o, String key) {
+        JsonElement e = o.get(key);
+        if (e == null || e.isJsonNull()) return null;
+        try { return e.getAsInt(); } catch (Exception ignore) { return null; }
+    }
 
-        int i = colon + 1;
-        while (i < json.length() && Character.isWhitespace(json.charAt(i))) i++;
-
-        int j = i;
-        while (j < json.length() && ("-0123456789.".indexOf(json.charAt(j)) >= 0)) j++;
-
-        if (j == i) return null;
-        return json.substring(i, j);
+    private static Double jDouble(JsonObject o, String key) {
+        JsonElement e = o.get(key);
+        if (e == null || e.isJsonNull()) return null;
+        try { return e.getAsDouble(); } catch (Exception ignore) { return null; }
     }
 }
