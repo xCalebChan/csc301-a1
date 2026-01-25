@@ -17,11 +17,8 @@ public class ProductService {
 
     private static final int PORT = 8081;
 
-    // Creates products.db in the working directory you run from
-    private static final String DB_URL = "jdbc:sqlite:products.db";
-
     // ---------- Model ----------
-    static class Product {
+    public static class Product {
         int id;
         String productname;
         double price;
@@ -63,7 +60,6 @@ public class ProductService {
 
     private static void requireNonBlank(HttpExchange ex, String value, String field) throws IOException {
         if (isBlank(value)) {
-            // Treat blank as invalid (even if present)
             sendJson(ex, 400, "{\"error\":\"Field cannot be empty: " + field + "\"}");
             throw new IllegalArgumentException("Empty " + field);
         }
@@ -115,10 +111,9 @@ public class ProductService {
         }
     }
 
-
     // ---------- Main ----------
     public static void main(String[] args) throws IOException {
-        initDb();
+        DatabaseManager.initDb();
 
         HttpServer server = HttpServer.create(new InetSocketAddress(PORT), 0);
         server.setExecutor(Executors.newFixedThreadPool(20));
@@ -129,32 +124,6 @@ public class ProductService {
         System.out.println("SQLite DB: products.db");
     }
 
-    // ---------- DB init / connection ----------
-    private static void initDb() {
-        try (Connection c = DriverManager.getConnection(DB_URL);
-             Statement st = c.createStatement()) {
-
-            // Recommended for concurrent reads/writes:
-            st.execute("PRAGMA journal_mode=WAL;");
-            st.execute("PRAGMA foreign_keys=ON;");
-
-            st.executeUpdate(
-                    "CREATE TABLE IF NOT EXISTS products (" +
-                            "id INTEGER PRIMARY KEY," +
-                            "productname TEXT NOT NULL," +
-                            "price REAL NOT NULL," +
-                            "quantity INTEGER NOT NULL" +
-                            ")"
-            );
-        } catch (SQLException e) {
-            throw new RuntimeException("Failed to initialize DB: " + e.getMessage(), e);
-        }
-    }
-
-    private static Connection openConn() throws SQLException {
-        return DriverManager.getConnection(DB_URL);
-    }
-    
     static class ProductHandler implements HttpHandler {
         @Override
         public void handle(HttpExchange exchange) throws IOException {
@@ -178,12 +147,10 @@ public class ProductService {
         private void handlePost(HttpExchange exchange) throws IOException, SQLException {
             try {
                 String body = readBody(exchange);
-
                 JsonObject json = parseJsonObject(exchange, body);
 
                 String command = jString(json, "command");
                 Integer id = jInt(json, "id");
-
 
                 requireNonBlank(exchange, command, "command");
                 requirePositiveInt(exchange, id, "id");
@@ -191,9 +158,9 @@ public class ProductService {
                 command = command.trim().toLowerCase();
 
                 switch (command) {
-                    case "create": handleCreate(exchange, json, body, id); break;
-                    case "update": handleUpdate(exchange, json, body, id); break;
-                    case "delete": handleDelete(exchange, json, body, id); break;
+                    case "create": handleCreate(exchange, json, id); break;
+                    case "update": handleUpdate(exchange, json, id); break;
+                    case "delete": handleDelete(exchange, json, id); break;
                     default: sendJson(exchange, 400, "{\"error\":\"Invalid command\"}");
                 }
             } catch (IllegalArgumentException ignored) {
@@ -201,7 +168,7 @@ public class ProductService {
             }
         }
 
-        private void handleCreate(HttpExchange exchange, JsonObject json, String body, int id) throws IOException, SQLException {
+        private void handleCreate(HttpExchange exchange, JsonObject json, int id) throws IOException, SQLException {
             String productname = jString(json, "productname");
             Double price = jDouble(json, "price");
             Integer quantity = jInt(json, "quantity");
@@ -214,8 +181,8 @@ public class ProductService {
                 return;
             }
 
-            try (Connection c = openConn()) {
-                if (dbExistsById(c, id)) {
+            try (Connection c = DatabaseManager.openConn()) {
+                if (DatabaseManager.dbExistsById(c, id)) {
                     sendJson(exchange, 409, "{\"error\":\"Product id already exists\"}");
                     return;
                 }
@@ -233,19 +200,17 @@ public class ProductService {
             sendJson(exchange, 200, new Product(id, productname, price, quantity).toJson());
         }
 
-        private void handleUpdate(HttpExchange exchange, JsonObject json, String body, int id) throws IOException, SQLException {
+        private void handleUpdate(HttpExchange exchange, JsonObject json, int id) throws IOException, SQLException {
             String productname = jString(json, "productname");
             Double price = jDouble(json, "price");
             Integer quantity = jInt(json, "quantity");
 
             try {
-                // must provide at least one updatable field
                 if (productname == null && price == null && quantity == null) {
                     sendJson(exchange, 400, "{\"error\":\"No updatable fields provided\"}");
                     return;
                 }
 
-                // validate only the provided ones
                 validateOptionalNonBlank(exchange, productname, "productname");
                 validateOptionalNonNegativeDouble(exchange, price, "price");
                 validateOptionalNonNegativeInt(exchange, quantity, "quantity");
@@ -253,10 +218,9 @@ public class ProductService {
                 return;
             }
 
-
             Product updated;
-            try (Connection c = openConn()) {
-                Product existing = dbGetById(c, id);
+            try (Connection c = DatabaseManager.openConn()) {
+                Product existing = DatabaseManager.dbGetById(c, id);
                 if (existing == null) {
                     sendJson(exchange, 404, "{\"error\":\"Product not found\"}");
                     return;
@@ -281,7 +245,7 @@ public class ProductService {
             sendJson(exchange, 200, updated.toJson());
         }
 
-        private void handleDelete(HttpExchange exchange, JsonObject json, String body, int id) throws IOException, SQLException {
+        private void handleDelete(HttpExchange exchange, JsonObject json, int id) throws IOException, SQLException {
             String productname = jString(json, "productname");
             Double price = jDouble(json, "price");
             Integer quantity = jInt(json, "quantity");
@@ -294,8 +258,8 @@ public class ProductService {
                 return;
             }
 
-            try (Connection c = openConn()) {
-                if (!dbExistsById(c, id)) {
+            try (Connection c = DatabaseManager.openConn()) {
+                if (!DatabaseManager.dbExistsById(c, id)) {
                     sendJson(exchange, 404, "{\"error\":\"Product not found\"}");
                     return;
                 }
@@ -347,8 +311,8 @@ public class ProductService {
             }
 
             Product p;
-            try (Connection c = openConn()) {
-                p = dbGetById(c, id);
+            try (Connection c = DatabaseManager.openConn()) {
+                p = DatabaseManager.dbGetById(c, id);
             }
 
             if (p == null) {
@@ -366,32 +330,6 @@ public class ProductService {
                 String line;
                 while ((line = br.readLine()) != null) sb.append(line);
                 return sb.toString();
-            }
-        }
-    }
-
-    // ---------- DB helpers ----------
-    private static boolean dbExistsById(Connection c, int id) throws SQLException {
-        try (PreparedStatement ps = c.prepareStatement("SELECT 1 FROM products WHERE id=?")) {
-            ps.setInt(1, id);
-            try (ResultSet rs = ps.executeQuery()) {
-                return rs.next();
-            }
-        }
-    }
-
-    private static Product dbGetById(Connection c, int id) throws SQLException {
-        try (PreparedStatement ps = c.prepareStatement(
-                "SELECT id, productname, price, quantity FROM products WHERE id=?")) {
-            ps.setInt(1, id);
-            try (ResultSet rs = ps.executeQuery()) {
-                if (!rs.next()) return null;
-                return new Product(
-                        rs.getInt("id"),
-                        rs.getString("productname"),
-                        rs.getDouble("price"),
-                        rs.getInt("quantity")
-                );
             }
         }
     }
