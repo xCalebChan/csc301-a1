@@ -188,7 +188,7 @@ public class UserService {
                 }
             } catch (SQLException e) {
                 // SQLite throws specific messages for constraint violations
-                if (e.getMessage().contains("UNIQUE constraint failed") || e.getMessage().contains("PRIMARY KEY")) {
+                if ("23505".equals(e.getSQLState()) || e.getMessage().contains("duplicate key")) {
                     sendResponse(exchange, 409, "{}"); // duplicate user
                 } else {
                     e.printStackTrace();

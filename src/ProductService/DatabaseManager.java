@@ -2,24 +2,21 @@ import java.sql.*;
 
 public class DatabaseManager {
 
-    // Creates products.db in the working directory you run from
-    private static final String DB_URL = "jdbc:sqlite:products.db";
+    private static final String DB_URL = "jdbc:postgresql://db.qvmekyovznxapjzhyudt.supabase.co:5432/postgres?sslmode=require";
+    private static final String DB_USER = "postgres";
+    private static final String DB_PASSWORD = "HmNUB18zTR4Fjjqc";
 
     // Match UserService naming
     public static void initialize() {
-        try (Connection c = DriverManager.getConnection(DB_URL);
+        try (Connection c = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD);
              Statement st = c.createStatement()) {
-
-            st.execute("PRAGMA journal_mode=WAL;");
-            st.execute("PRAGMA foreign_keys=ON;");
-            st.execute("PRAGMA busy_timeout=5000;"); // helps under concurrency
 
             st.executeUpdate(
                     "CREATE TABLE IF NOT EXISTS products (" +
                             "id INTEGER PRIMARY KEY," +
                             "name TEXT NOT NULL," +
                             "description TEXT NOT NULL," +
-                            "price REAL NOT NULL," +
+                            "price DOUBLE PRECISION NOT NULL," +
                             "quantity INTEGER NOT NULL" +
                             ")"
             );
@@ -37,7 +34,7 @@ public class DatabaseManager {
     }
 
     private static Connection openConn() throws SQLException {
-        return DriverManager.getConnection(DB_URL);
+        return DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD);
     }
 
     public static boolean productExists(int id) throws SQLException {

@@ -1,23 +1,15 @@
-import java.io.File;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
 public class DatabaseManager {
-    private static final String DB_FILE_NAME = "user_service.db";
-    private static final String DB_URL = "jdbc:sqlite:" + DB_FILE_NAME;
-    private static Connection connection = null;
+    private static final String DB_URL = "jdbc:postgresql://db.qvmekyovznxapjzhyudt.supabase.co:5432/postgres?sslmode=require";
+    private static final String DB_USER = "postgres"; 
+    private static final String DB_PASSWORD = "HmNUB18zTR4Fjjqc";
 
     // --- Singleton Connection ---
     public static Connection connect() throws SQLException {
-        if (connection == null || connection.isClosed()) {
-            boolean fileExists = new File(DB_FILE_NAME).exists();
-            if (!fileExists) {
-                System.out.println("Creating new database file...");
-            }
-            connection = DriverManager.getConnection(DB_URL);
-        }
-        return connection;
+        return DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD);
     }
 
     // --- Initialization ---
@@ -29,7 +21,7 @@ public class DatabaseManager {
                      "password TEXT)";
         try (Connection conn = connect(); Statement stmt = conn.createStatement()) {
             stmt.execute(sql);
-            System.out.println("Database initialized.");
+            System.out.println("Database initialized (connected to Postgres).");
         } catch (SQLException e) {
             e.printStackTrace();
         }
